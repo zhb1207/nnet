@@ -181,19 +181,27 @@ func (sl *NeighborList) AddOrReplace(remoteNode *node.RemoteNode) (bool, *node.R
 
 	var replaced *node.RemoteNode
 
+	// condition sl.Cap() > 0 excludes c.addneighbor(), it will never have a replaced node, as c.neighbors has Cap()=0, infinity, in other words
+	// if >= then there must be some node to be replaced
 	if sl.Cap() > 0 && sl.Len() >= sl.Cap() {
 		replaced = sl.GetLast()
+		// new node has larger distance than replaced or same, no need to add
 		if replaced != nil && sl.cmp(remoteNode.Node.Node, replaced.Node.Node) >= 0 {
 			return false, nil, nil
 		}
 	}
 
+	// if sl.Len() < sl.Cap(), then try to load or store
+	// if loaded, then the node is already in the neighbor list, no need to add and no replaced
 	_, loaded := sl.nodes.LoadOrStore(string(remoteNode.Id), remoteNode)
 	if loaded {
 		log.Info("Node already in neighbor list")
 		return false, nil, nil
 	}
 
+	// if not loaded, then the remote node should be added
+	// and here check the replaced found(sl.Len() >= sl.Cap() and new node has less distance then replaced)
+	// or not(sl.Len() < sl.Cap())
 	if replaced != nil {
 		sl.Remove(replaced)
 	}
@@ -262,7 +270,7 @@ func (sl *NeighborList) getNewNodesToConnect(msgIDBytes uint8) ([]*protobuf.Node
 	allNodes = append(allNodes, succs...)
 	allNodes = append(allNodes, preds...)
 
-	seen := make(map[string]struct{}, len(allNodes))
+	seen := make(map[string]struct{}, len(allNodes)) // to skip all duplicate nodes
 	uniqueNodes := make([]*protobuf.Node, 0)
 
 	for _, n := range allNodes {

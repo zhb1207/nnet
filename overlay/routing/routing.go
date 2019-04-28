@@ -68,7 +68,8 @@ func (r *Routing) Stop(err error) {
 func (r *Routing) SendMessage(router Router, remoteMsg *node.RemoteMessage, hasReply bool, replyTimeout time.Duration) (<-chan *node.RemoteMessage, bool, error) {
 	var shouldCallNextMiddleware bool
 	success := false
-
+	// have different kinds of returned values in different routing types
+	// such as directly, broadcasting, etc.
 	localNode, remoteNodes, err := router.GetNodeToRoute(remoteMsg)
 	if err != nil {
 		return nil, false, err

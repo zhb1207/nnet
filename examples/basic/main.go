@@ -34,7 +34,7 @@ func create(transport string, port uint16) (*nnet.NNet, error) {
 
 func main() {
 	transportPtr := flag.String("t", "tcp", "transport type, tcp or kcp")
-	numNodesPtr := flag.Int("n", 10, "number of nodes")
+	numNodesPtr := flag.Int("n", 3, "number of nodes")
 	flag.Parse()
 
 	if *numNodesPtr < 1 {

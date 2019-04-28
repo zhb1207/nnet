@@ -47,9 +47,13 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 	conf := localNode.Config
 	nodeIDBits := conf.NodeIDBytes * 8
 
+	// When there is only one node, the succ and pred is itself
 	next := nextID(localNode.Id, nodeIDBits)
 	prev := prevID(localNode.Id, nodeIDBits)
 
+	// successors, so reversed is set false, when doing cmp, return res instead of -res(when predecessors)
+	// as the chord use a circle, successors starts from next to prev
+	// and predecessor starts from prev to next (reversed)
 	successors, err := NewNeighborList(next, prev, nodeIDBits, conf.MinNumSuccessors, false)
 	if err != nil {
 		return nil, err
@@ -62,8 +66,10 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 
 	fingerTable := make([]*NeighborList, nodeIDBits)
 	for i := uint32(0); i < nodeIDBits; i++ {
+		// calculate (localnode.Id + 2^i) % 2^256 to record in fingertable, [startID, endID)
+		// fingerTable[i].endID - fingerTable[i].startID = 2 ^ i
 		startID := powerOffset(localNode.Id, i, nodeIDBits)
-		endID := prevID(powerOffset(localNode.Id, i+1, nodeIDBits), nodeIDBits)
+		endID := prevID(powerOffset(localNode.Id, i+1, nodeIDBits), nodeIDBits) // i+1
 		fingerTable[i], err = NewNeighborList(startID, endID, nodeIDBits, conf.NumFingerSuccessors, false)
 		if err != nil {
 			return nil, err
@@ -89,7 +95,7 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 		neighbors:             neighbors,
 		middlewareStore:       middlewareStore,
 	}
-
+	// DIRECT Message
 	directRxMsgChan, err := localNode.GetRxMsgChan(protobuf.DIRECT)
 	if err != nil {
 		return nil, err
@@ -102,7 +108,7 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	// RELAY Message
 	relayRxMsgChan, err := localNode.GetRxMsgChan(protobuf.RELAY)
 	if err != nil {
 		return nil, err
@@ -115,7 +121,7 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	// BROADCAST_PUSH Message
 	broadcastRxMsgChan, err := localNode.GetRxMsgChan(protobuf.BROADCAST_PUSH)
 	if err != nil {
 		return nil, err
@@ -128,7 +134,7 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	// BROADCAST_TREE Message
 	broadcastTreeRxMsgChan, err := localNode.GetRxMsgChan(protobuf.BROADCAST_TREE)
 	if err != nil {
 		return nil, err
@@ -141,9 +147,9 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	// remotenode.go:159, when remotenode start this middleware will be applied
 	err = localNode.ApplyMiddleware(node.RemoteNodeReady(func(rn *node.RemoteNode) bool {
-		c.addRemoteNode(rn)
+		c.addRemoteNode(rn) // successors + predecessors + fingerTable + neighbors
 		return true
 	}))
 	if err != nil {
@@ -151,7 +157,7 @@ func NewChord(localNode *node.LocalNode) (*Chord, error) {
 	}
 
 	err = localNode.ApplyMiddleware(node.RemoteNodeDisconnected(func(rn *node.RemoteNode) bool {
-		c.removeNeighbor(rn)
+		c.removeNeighbor(rn) // successors + predecessors + fingerTable + neighbors
 		return true
 	}))
 	if err != nil {
@@ -179,9 +185,12 @@ func (c *Chord) Start(isCreate bool) error {
 		}
 
 		var joinOnce sync.Once
-
+		// overlay/chord/neighbor.go: 45
+		// This func calls c.Connect -> c.addRemoteNode(remoteNode) -> c.addSuccessor(remoteNode) -> for _, f := range c.middlewareStore.successorAdded
+		// only successoradded event needs to stabilize the status
 		err := c.ApplyMiddleware(SuccessorAdded(func(remoteNode *node.RemoteNode, index int) bool {
 			joinOnce.Do(func() {
+				log.Infof("#########Successor of %s Added: %s", c.LocalNode.GetAddr(), remoteNode.GetAddr())
 				var succs []*protobuf.Node
 				var err error
 
@@ -201,6 +210,8 @@ func (c *Chord) Start(isCreate bool) error {
 
 				for _, succ := range succs {
 					if CompareID(succ.Id, c.LocalNode.Id) != 0 {
+						// final step of c.Connect: c.addRemoteNode(remoteNode), remoteNode is established by Addr or Id
+						// connect c to succ, if succ.id found, invoke c.addRemoteNode to add succ/pred/finger/neighbor
 						err = c.Connect(succ.Addr, succ.Id)
 						if err != nil {
 							log.Error(err)
@@ -225,17 +236,18 @@ func (c *Chord) Start(isCreate bool) error {
 			}
 		}
 
-		err = c.StartRouters()
+		err = c.StartRouters() // go r.handleMsg(router)
 		if err != nil {
 			c.Stop(err)
 			return
 		}
 
+		// receive a msg and decide to process by chord or chord.localnode
 		for i := 0; i < numWorkers; i++ {
 			go c.handleMsg()
 		}
 
-		err = c.LocalNode.Start()
+		err = c.LocalNode.Start() // Once.Do: go ln.handleMsg() + go ln.listen()
 		if err != nil {
 			c.Stop(err)
 			return

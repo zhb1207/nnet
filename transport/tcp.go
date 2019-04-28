@@ -17,7 +17,7 @@ func NewTCPTransport() *TCPTransport {
 	return t
 }
 
-// Dial connects to the remote address on the network "tcp"
+// Dial uses local address and new a port to connect to the remote address on the network "tcp"
 func (t *TCPTransport) Dial(addr string, dialTimeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout(t.GetNetwork(), addr, dialTimeout)
 }

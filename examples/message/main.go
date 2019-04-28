@@ -106,12 +106,13 @@ func main() {
 		}
 	}
 
+	// SendBytes will invoke SendMessage
 	time.Sleep(time.Duration(*numNodesPtr/5) * time.Second)
 	for i := 3; i > 0; i-- {
 		log.Infof("Sending broadcast message in %d seconds", i)
 		time.Sleep(time.Second)
 	}
-	_, err = nnets[0].SendBytesBroadcastAsync(
+	_, err = nnets[0].SendBytesBroadcastAsync( // nn.SendMessageAsync -> ovl.SendMessage -> ovl.GetRouter(routingType).SendMessage
 		[]byte("This message should be received by EVERYONE!"),
 		protobuf.BROADCAST_PUSH,
 	)

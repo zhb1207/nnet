@@ -35,9 +35,14 @@ func bigIntToID(i big.Int, m uint32) []byte {
 	return b
 }
 
+// len(id) = 32
 func idToBigInt(id []byte) big.Int {
 	idInt := big.Int{}
 	idInt.SetBytes(id)
+	// idInt[0] = id[31]*256^0+id[30]*256^1+...+id[24]*256^7
+	// idInt[1] = id[23]*256^0+id[22]*256^1+...+id[16]*256^7
+	// idInt[2] =
+	// idInt[3] =
 	return idInt
 }
 

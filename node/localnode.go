@@ -176,7 +176,7 @@ func (ln *LocalNode) listen() {
 	}
 	ln.listener = listener
 
-	if ln.port == 0 {
+	if ln.port == 0 { // random port, run SplitHostPort to get the exact portnum
 		_, portStr, err := net.SplitHostPort(listener.Addr().String())
 		if err != nil {
 			ln.Stop(err)
@@ -255,15 +255,15 @@ func (ln *LocalNode) Connect(remoteNodeAddr string) (*RemoteNode, bool, error) {
 
 	key := remoteAddress.ConnRemoteAddr()
 	value, loaded := ln.neighbors.LoadOrStore(key, nil)
-	if loaded {
+	if loaded { // the key is found in the Map, meaning that the remoteAddress is joined before
 		remoteNode, ok := value.(*RemoteNode)
 		if ok {
 			if remoteNode.IsStopped() {
 				log.Warningf("Remove stopped remote node %v from list", remoteNode)
 				ln.neighbors.Delete(key)
-			} else {
+			} else { // if remoteNode found and not IsStopped:
 				log.Infof("Load remote node %v from list", remoteNode)
-				return remoteNode, remoteNode.IsReady(), nil
+				return remoteNode, remoteNode.IsReady(), nil // only here may the True status returned
 			}
 		} else {
 			log.Infof("Another goroutine is connecting to %s", key)
@@ -271,6 +271,8 @@ func (ln *LocalNode) Connect(remoteNodeAddr string) (*RemoteNode, bool, error) {
 		}
 	}
 
+	// c.join -> c.connect -> c.ln.connect -> dial(remoteaddress) from c
+	log.Infof("#########Dialing from %s to %s", ln.Addr, remoteAddress.String())
 	conn, err := remoteAddress.Dial(ln.DialTimeout)
 	if err != nil {
 		ln.neighbors.Delete(key)
@@ -283,7 +285,8 @@ func (ln *LocalNode) Connect(remoteNodeAddr string) (*RemoteNode, bool, error) {
 		conn.Close()
 		return nil, false, err
 	}
-
+	// remoteAddress -> conn -> remoteNode
+	// remoteAddress --------->	key
 	ln.neighbors.Store(key, remoteNode)
 
 	return remoteNode, false, nil

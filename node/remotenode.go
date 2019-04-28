@@ -118,8 +118,10 @@ func (rn *RemoteNode) Start() error {
 			}
 
 			var existing *RemoteNode
+			log.Infof("#########Range: from %s to %s", rn.conn.LocalAddr(), rn.conn.RemoteAddr())
 			rn.LocalNode.neighbors.Range(func(key, value interface{}) bool {
 				remoteNode, ok := value.(*RemoteNode)
+				log.Infof("#########remotenode: %v", remoteNode)
 				if ok && remoteNode.IsReady() && bytes.Equal(remoteNode.Id, n.Id) {
 					if remoteNode.IsStopped() {
 						log.Warningf("Remove stopped remote node %v from list", remoteNode)
@@ -127,7 +129,7 @@ func (rn *RemoteNode) Start() error {
 					} else {
 						existing = remoteNode
 					}
-					return false
+					return false // stop Range iteration
 				}
 				return true
 			})

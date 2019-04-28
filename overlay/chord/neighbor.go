@@ -19,12 +19,13 @@ func (c *Chord) Connect(addr string, id []byte) error {
 		}
 	}
 
+	// remoteNode related to addr will be created and will start -> SetReady(true)
 	remoteNode, ready, err := c.LocalNode.Connect(addr)
 	if err != nil {
 		return err
 	}
 
-	if ready {
+	if ready { // if remoteNode is ready, try to add it to c
 		return c.addRemoteNode(remoteNode)
 	}
 
@@ -42,7 +43,7 @@ func (c *Chord) addSuccessor(remoteNode *node.RemoteNode) error {
 		if added {
 			index := c.successors.GetIndex(remoteNode.Id)
 			if index >= 0 {
-				for _, f := range c.middlewareStore.successorAdded {
+				for _, f := range c.middlewareStore.successorAdded { // this is added in chord.Start()
 					if !f(remoteNode, index) {
 						break
 					}
@@ -51,7 +52,7 @@ func (c *Chord) addSuccessor(remoteNode *node.RemoteNode) error {
 		}
 
 		if replaced != nil {
-			for _, f := range c.middlewareStore.successorRemoved {
+			for _, f := range c.middlewareStore.successorRemoved { // no ApplyMiddleWare found for successorRemoved
 				if !f(replaced) {
 					break
 				}
@@ -186,6 +187,7 @@ func (c *Chord) addRemoteNode(remoteNode *node.RemoteNode) error {
 	}
 
 	for i := range c.fingerTable {
+		// i = [0,255], walkthrough the fingertable to decide which index to insert the remotenode
 		err = c.addFingerTable(remoteNode, i)
 		if err != nil {
 			log.Error(err)

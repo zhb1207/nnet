@@ -58,6 +58,12 @@ func main() {
 		return
 	}
 
+	// 在调用了ApplyMiddleware时，会在middlewareStore中存储相应的函数slice，并在不同位置调用store中的函数：
+	// for _, f := range c.middlewareStore.networkWillStart {
+	// 	if !f(c) {  // 按照加入顺序调用networkWillStart中的所有函数，并拿到返回值true or false，如果返回false则不再执行slice中后续的函数
+	// 		break
+	// 	}
+	// }
 	nn.MustApplyMiddleware(overlay.NetworkWillStart(func(network overlay.Network) bool {
 		log.Infof("Network will start")
 		return true
