@@ -110,6 +110,7 @@ func (c *Chord) addFingerTable(remoteNode *node.RemoteNode, index int) error {
 
 		if added {
 			i := finger.GetIndex(remoteNode.Id)
+			log.Infof("#########FingerTable: Node with id %x is added to fingertable %d on node %x", remoteNode.Id, i, c.GetLocalNode().Id)
 			if i >= 0 {
 				for _, f := range c.middlewareStore.fingerTableAdded {
 					if !f(remoteNode, index, i) {
